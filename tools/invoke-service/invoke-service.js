@@ -232,7 +232,8 @@ function buildAemPageUrl(org, repo, path) {
 
 /* ── External service call ───────────────────────────────────────────── */
 
-async function invokeExternalService(token, context) {
+async function invokeExternalService(token, context, onProgress = () => {}) {
+  onProgress('Fetching page details…');
   // eslint-disable-next-line no-console
   console.log('[invoke-service] DA SDK context →', JSON.stringify(context, null, 2));
 
@@ -240,6 +241,7 @@ async function invokeExternalService(token, context) {
   // eslint-disable-next-line no-console
   console.log('[invoke-service] Resolved →', { org, repo, path });
 
+  onProgress('Collecting user details…');
   const [profile, config] = await Promise.all([
     fetchUserProfile(token),
     fetchPlaceholders(org, repo).catch((err) => {
@@ -278,6 +280,7 @@ async function invokeExternalService(token, context) {
 
   resolvedPayload.aemPageUrl = buildAemPageUrl(org, repo, path);
 
+  onProgress('Creating project in Workfront…');
   // eslint-disable-next-line no-console
   console.log('[invoke-service] Calling service →', resolvedUrl);
 
@@ -294,7 +297,11 @@ async function invokeExternalService(token, context) {
     throw new Error(`External service error: ${resp.status} – ${errorBody}`);
   }
 
-  return resp.json();
+  onProgress('Creating review task…');
+  const result = await resp.json();
+  onProgress('Assigning it to you…');
+  onProgress('Nearly completed…');
+  return result;
 }
 
 // Every task always shows the same set of action buttons; each one is disabled
@@ -355,6 +362,8 @@ class RefDemoInvokeService extends LitElement {
     _view: { state: true }, // 'confirm' | 'loading' | 'result'
     _isSuccess: { state: true },
     _message: { state: true },
+    _loadingMessage: { state: true },
+    _loadingStalled: { state: true },
     _serviceUrl: { state: true },
     // Tasks tab
     _tasksState: { state: true }, // 'idle' | 'loading' | 'loaded' | 'error'
@@ -368,9 +377,36 @@ class RefDemoInvokeService extends LitElement {
     super();
     this._tab = 'tasks';
     this._view = 'confirm';
+    this._loadingMessage = 'Fetching page details…';
+    this._loadingStalled = false;
     this._tasksState = 'idle';
     this._tasks = [];
     this._taskQuery = '';
+    this._progressWatchdog = null;
+    this._lastProgressAt = 0;
+  }
+
+  setLoadingMessage(message) {
+    this._loadingMessage = message;
+    this._loadingStalled = false;
+    this._lastProgressAt = Date.now();
+  }
+
+  startProgressWatchdog() {
+    this._lastProgressAt = Date.now();
+    this._loadingStalled = false;
+    this._progressWatchdog = window.setInterval(() => {
+      if (Date.now() - this._lastProgressAt > 10000) {
+        this._loadingStalled = true;
+      }
+    }, 1000);
+  }
+
+  stopProgressWatchdog() {
+    if (this._progressWatchdog) {
+      clearInterval(this._progressWatchdog);
+      this._progressWatchdog = null;
+    }
   }
 
   get filteredTasks() {
@@ -435,15 +471,19 @@ class RefDemoInvokeService extends LitElement {
 
   async run() {
     this._view = 'loading';
+    this.startProgressWatchdog();
     try {
-      await invokeExternalService(this.token, this.context);
+      await invokeExternalService(this.token, this.context, (message) => this.setLoadingMessage(message));
+      this.setLoadingMessage('Done.');
       this._isSuccess = true;
-      this._message = 'The external service executed successfully.';
+      this._message = 'Done. Review request submitted and Workfront items were created.';
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('[invoke-service] Error:', err);
       this._isSuccess = false;
-      this._message = err.message || 'An unexpected error occurred.';
+      this._message = err.message || 'Review request failed. Please try again.';
+    } finally {
+      this.stopProgressWatchdog();
     }
     this._view = 'result';
   }
@@ -513,15 +553,15 @@ class RefDemoInvokeService extends LitElement {
     return html`
       <div class="invoke-service-panel">
         <p class="invoke-service-message">
-          Invoke the external service for this document?
+          Send this page for review and create a Workfront task?
           <span class="info-tip" tabindex="0" role="button" aria-label="Endpoint configuration info">
             ${ACTION_ICONS.info()}
             <span class="info-tip-bubble" role="tooltip">Submission endpoint can be configured in the placeholders file with key : external-service-url</span>
           </span>
         </p>
         <div class="invoke-service-actions">
-          <sl-button class="secondary" @click=${this.close}>Cancel</sl-button>
-          <sl-button ?disabled=${!this._serviceUrl} @click=${this.run}>Confirm</sl-button>
+          <sl-button class="secondary" @click=${this.close}>No</sl-button>
+          <sl-button ?disabled=${!this._serviceUrl} @click=${this.run}>Yes</sl-button>
         </div>
       </div>`;
   }
@@ -561,7 +601,10 @@ class RefDemoInvokeService extends LitElement {
           <div class="invoke-service-panel">
             <div class="invoke-service-loading">
               <div class="spinner" aria-hidden="true"></div>
-              <p class="invoke-service-message">Executing external service…</p>
+              <p class="invoke-service-message">${this._loadingMessage}</p>
+              ${this._loadingStalled
+    ? html`<p class="invoke-service-message">Still working in Workfront. This is taking longer than usual…</p>`
+    : nothing}
             </div>
           </div>`;
       case 'result':
@@ -687,7 +730,7 @@ class RefDemoInvokeService extends LitElement {
     return html`
       <div class="tabs" role="tablist">
         ${this.renderTab('tasks', 'Tasks')}
-        ${this.renderTab('service', 'Service')}
+        ${this.renderTab('service', 'Request Approval')}
       </div>
       <div class="tab-panel" role="tabpanel">
         ${this._tab === 'service' ? this.renderService() : this.renderTasks()}
