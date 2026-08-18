@@ -148,6 +148,15 @@ function toNumberOrZero(value) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function getStatusSortRank(status) {
+  const s = (status || '').toUpperCase();
+  if (s === 'NEW') return 0;
+  if (s === 'INP') return 1;
+  if (s === 'CPL') return 3;
+  if (s === 'REJ') return 4;
+  return 2;
+}
+
 async function fetchWorkfrontTasks(url, assignedToId, token) {
   const target = new URL(AIO_WF_ACTION_ENDPOINT);
   target.searchParams.set('url', url);
@@ -172,6 +181,8 @@ async function fetchWorkfrontTasks(url, assignedToId, token) {
   tasks.sort((a, b) => {
     const byDate = getTaskSortDateMs(b) - getTaskSortDateMs(a);
     if (byDate !== 0) return byDate;
+    const byStatus = getStatusSortRank(a.status) - getStatusSortRank(b.status);
+    if (byStatus !== 0) return byStatus;
     return toNumberOrZero(b.taskNumber) - toNumberOrZero(a.taskNumber);
   });
 
