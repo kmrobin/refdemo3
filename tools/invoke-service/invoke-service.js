@@ -1,7 +1,7 @@
 // eslint-disable-next-line import/no-unresolved
 import DA_SDK from 'https://da.live/nx/utils/sdk.js';
 // eslint-disable-next-line import/no-unresolved
-import { LitElement, html, nothing } from 'da-lit';
+import { LitElement, html, nothing } from 'https://da.live/deps/lit/dist/index.js';
 
 // Super Lite components (sl-button, etc.)
 import 'https://da.live/nx/public/sl/components.js';
