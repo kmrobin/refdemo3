@@ -647,10 +647,13 @@ class RefDemoInvokeService extends LitElement {
     const overdue = isTaskOverdue(task);
     const pct = Math.round(task.percentComplete || 0);
     const statusClass = (task.status || '').toLowerCase();
+    const taskTitle = task.URL
+      ? html`<a class="task-name task-name-link" href=${task.URL} target="_blank" rel="noopener" title=${task.name}>${task.name}</a>`
+      : html`<p class="task-name" title=${task.name}>${task.name}</p>`;
     return html`
       <li class="task">
         <div class="task-head">
-          <p class="task-name" title=${task.name}>${task.name}</p>
+          ${taskTitle}
           <div class="task-actions">
             ${busy
     ? html`<div class="spinner" aria-hidden="true"></div>`
