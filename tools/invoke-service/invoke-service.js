@@ -476,7 +476,7 @@ class RefDemoInvokeService extends LitElement {
       await invokeExternalService(this.token, this.context, (message) => this.setLoadingMessage(message));
       this.setLoadingMessage('Done.');
       this._isSuccess = true;
-      this._message = 'Done. Review request submitted and Workfront items were created.';
+      this._message = 'Done. Review request submitted.';
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('[invoke-service] Error:', err);
@@ -553,7 +553,7 @@ class RefDemoInvokeService extends LitElement {
     return html`
       <div class="invoke-service-panel">
         <p class="invoke-service-message">
-          Send this page for review and create a Workfront task?
+          Send this page for review?
           <span class="info-tip" tabindex="0" role="button" aria-label="Endpoint configuration info">
             ${ACTION_ICONS.info()}
             <span class="info-tip-bubble" role="tooltip">Submission endpoint can be configured in the placeholders file with key : external-service-url</span>
