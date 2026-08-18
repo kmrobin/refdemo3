@@ -255,6 +255,17 @@ function buildAemPageUrl(org, repo, path) {
   return `https://main--${repo}--${org}.aem.page${normalizedPath}`;
 }
 
+const REVIEW_PROGRESS_SEQUENCE = [
+  'Fetching page details…',
+  'Collecting user details…',
+  'Creating project in Workfront…',
+  'Creating review task…',
+  'Assigning it to the user…',
+  'Nearly completed…',
+];
+
+const REVIEW_SLOW_HINT = 'About to finish... just a few more seconds...';
+
 /* ── External service call ───────────────────────────────────────────── */
 
 async function invokeExternalService(token, context, onProgress = () => {}) {
@@ -388,7 +399,6 @@ class RefDemoInvokeService extends LitElement {
     _isSuccess: { state: true },
     _message: { state: true },
     _loadingMessage: { state: true },
-    _loadingStalled: { state: true },
     _serviceUrl: { state: true },
     // Tasks tab
     _tasksState: { state: true }, // 'idle' | 'loading' | 'loaded' | 'error'
@@ -402,35 +412,62 @@ class RefDemoInvokeService extends LitElement {
     super();
     this._tab = 'tasks';
     this._view = 'confirm';
-    this._loadingMessage = 'Fetching page details…';
-    this._loadingStalled = false;
+    this._loadingMessage = REVIEW_PROGRESS_SEQUENCE[0];
     this._tasksState = 'idle';
     this._tasks = [];
     this._taskQuery = '';
-    this._progressWatchdog = null;
-    this._lastProgressAt = 0;
+    this._progressIndex = 0;
+    this._progressTicker = null;
+    this._slowHintTimer = null;
+    this._slowHintShown = false;
   }
 
   setLoadingMessage(message) {
     this._loadingMessage = message;
-    this._loadingStalled = false;
-    this._lastProgressAt = Date.now();
   }
 
-  startProgressWatchdog() {
-    this._lastProgressAt = Date.now();
-    this._loadingStalled = false;
-    this._progressWatchdog = window.setInterval(() => {
-      if (Date.now() - this._lastProgressAt > 10000) {
-        this._loadingStalled = true;
+  advanceProgressTo(index) {
+    const bounded = Math.max(0, Math.min(index, REVIEW_PROGRESS_SEQUENCE.length - 1));
+    if (bounded <= this._progressIndex) return;
+    this._progressIndex = bounded;
+    this.setLoadingMessage(REVIEW_PROGRESS_SEQUENCE[this._progressIndex]);
+  }
+
+  handleServiceProgress(message) {
+    const idx = REVIEW_PROGRESS_SEQUENCE.indexOf(message);
+    if (idx !== -1) this.advanceProgressTo(idx);
+  }
+
+  startProgressSequence() {
+    this.stopProgressSequence();
+    this._progressIndex = 0;
+    this._slowHintShown = false;
+    this.setLoadingMessage(REVIEW_PROGRESS_SEQUENCE[0]);
+
+    this._progressTicker = window.setInterval(() => {
+      if (this._view !== 'loading') return;
+      if (this._progressIndex < REVIEW_PROGRESS_SEQUENCE.length - 1) {
+        this.advanceProgressTo(this._progressIndex + 1);
       }
-    }, 1000);
+    }, 2000);
+
+    this._slowHintTimer = window.setTimeout(() => {
+      if (this._view !== 'loading') return;
+      if (this._progressIndex >= REVIEW_PROGRESS_SEQUENCE.length - 2 && !this._slowHintShown) {
+        this._slowHintShown = true;
+        this.setLoadingMessage(REVIEW_SLOW_HINT);
+      }
+    }, 12000);
   }
 
-  stopProgressWatchdog() {
-    if (this._progressWatchdog) {
-      clearInterval(this._progressWatchdog);
-      this._progressWatchdog = null;
+  stopProgressSequence() {
+    if (this._progressTicker) {
+      clearInterval(this._progressTicker);
+      this._progressTicker = null;
+    }
+    if (this._slowHintTimer) {
+      clearTimeout(this._slowHintTimer);
+      this._slowHintTimer = null;
     }
   }
 
@@ -496,9 +533,10 @@ class RefDemoInvokeService extends LitElement {
 
   async run() {
     this._view = 'loading';
-    this.startProgressWatchdog();
+    this.startProgressSequence();
     try {
-      await invokeExternalService(this.token, this.context, (message) => this.setLoadingMessage(message));
+      await invokeExternalService(this.token, this.context, (message) => this.handleServiceProgress(message));
+      this.advanceProgressTo(REVIEW_PROGRESS_SEQUENCE.length - 1);
       this.setLoadingMessage('Done.');
       this._isSuccess = true;
       this._message = 'Done. Review request submitted.';
@@ -508,7 +546,7 @@ class RefDemoInvokeService extends LitElement {
       this._isSuccess = false;
       this._message = err.message || 'Review request failed. Please try again.';
     } finally {
-      this.stopProgressWatchdog();
+      this.stopProgressSequence();
     }
     this._view = 'result';
   }
@@ -627,9 +665,6 @@ class RefDemoInvokeService extends LitElement {
             <div class="invoke-service-loading">
               <div class="spinner" aria-hidden="true"></div>
               <p class="invoke-service-message">${this._loadingMessage}</p>
-              ${this._loadingStalled
-    ? html`<p class="invoke-service-message">Still working in Workfront. This is taking longer than usual…</p>`
-    : nothing}
             </div>
           </div>`;
       case 'result':
