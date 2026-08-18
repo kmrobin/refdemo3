@@ -1,0 +1,33 @@
+{
+  "definitions": [
+    {
+      "title": "Video",
+      "id": "video",
+      "model": "video",
+      "plugins": {
+        "da": {
+          "rows": 1,
+          "columns": 1,
+          "fields": [
+            { "name": "videoUrl", "selector": "div>div>p>a[href]" }
+          ]
+        }
+      }
+    }
+  ],
+  "models": [
+    {
+      "id": "video",
+      "fields": [
+        {
+          "component": "text",
+          "name": "videoUrl",
+          "label": "Video URL",
+          "valueType": "string",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "filters": []
+}

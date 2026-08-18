@@ -1,0 +1,68 @@
+{
+  "definitions": [
+    {
+      "title": "Teaser",
+      "id": "teaser",
+      "model": "teaser",
+      "plugins": {
+        "da": {
+          "rows": 1,
+          "columns": 1,
+          "fields": [
+            { "name": "teaserBlurb", "selector": "div:nth-child(1)>div:nth-child(1)>p" },
+            { "name": "teaserStyle", "selector": "div:nth-child(2)>div:nth-child(1)>p" },
+            { "name": "videoReference", "selector": "div:nth-child(3)>div:nth-child(1)>p" },
+            { "name": "imageReference", "selector": "div:nth-child(4)>div:nth-child(1)>picture>img[src]" },
+            { "name": "buttonText", "selector": "div:nth-child(5)>div:nth-child(1)>p" },
+            { "name": "buttonLink", "selector": "div:nth-child(6)>div:nth-child(1)>a[href]" }
+          ]
+        }
+      }
+    }
+  ],
+  "models": [
+    {
+      "id": "teaser",
+      "fields": [
+        {
+          "component": "text",
+          "name": "teaserBlurb",
+          "label": "Teaser Blurb",
+          "required": true
+        },
+        {
+          "component": "text",
+          "name": "teaserStyle",
+          "label": "Teaser Style",
+          "required": true
+        },
+        {
+          "component": "richtext",
+          "name": "videoReference",
+          "label": "Video Reference",
+          "required": true
+        },
+        {
+          "component": "reference",
+          "valueType": "string",
+          "name": "imageReference",
+          "label": "Image Reference",
+          "required": true
+        },
+        {
+          "component": "text",
+          "name": "buttonText",
+          "label": "Button Text",
+          "required": true
+        },
+        {
+          "component": "text",
+          "name": "buttonLink",
+          "label": "Button Link",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "filters": []
+}

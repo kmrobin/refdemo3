@@ -1,0 +1,28 @@
+{
+  "definitions": [
+    {
+      "title": "Text",
+      "id": "text",
+      "plugins": {
+        "da": {
+          "name": "text",
+          "type": "text"
+        }
+      }
+    }
+  ],
+  "models": [
+    {
+      "id": "text",
+      "fields": [
+      {
+        "component": "text",
+        "name": "text",
+        "value": "",
+        "label": "Text",
+        "valueType": "string"
+      }
+    ]
+    }
+  ]
+}
