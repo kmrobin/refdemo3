@@ -9,6 +9,7 @@ import { uploadAssetsInBatches } from '../lib/uploadAssets.js';
 import { copyImageToClipboard } from '../lib/clipboard.js';
 import { openScrapeModal } from '../lib/scrapeModal.js';
 import { track, EVENTS } from '../lib/analytics.js';
+import { saveCachedImages } from '../lib/imageCache.js';
 import { UPLOAD_TO_DAM_ACTION_URL } from '../config.js';
 
 export function renderImagesTab(container, ctx) {
@@ -66,6 +67,7 @@ export function renderImagesTab(container, ctx) {
         // Real usage always goes through the DAM upload below.
         if (!UPLOAD_TO_DAM_ACTION_URL) {
           state.images.push(...urls.map((src) => ({ path: src })));
+          saveCachedImages({ org: ctx.org, repo: ctx.repo, images: state.images });
           toast('upload-to-dam not configured \u2014 showing scraped URLs directly (not uploaded to DAM).', true);
           track(EVENTS.IMPORT_COMPLETED);
           rerender();
@@ -75,6 +77,7 @@ export function renderImagesTab(container, ctx) {
         state.uploadStatus = `Uploading 0/${urls.length}\u2026`;
         rerender();
         let done = 0;
+        let failed = 0;
         try {
           for await (const result of uploadAssetsInBatches(urls, {
             imsToken: ctx.token,
@@ -84,8 +87,17 @@ export function renderImagesTab(container, ctx) {
             siteUrl,
           })) {
             done += 1;
-            if (result.ok && result.path) state.images.push({ path: result.path });
-            state.uploadStatus = `Uploading ${done}/${urls.length}\u2026`;
+            if (result.ok && result.path) {
+              state.images.push({ path: result.path });
+              // Persist after every successful item, not just at the end —
+              // a later batch timing out (large imports commonly hit the
+              // Runtime web action's ~60s gateway ceiling) shouldn't lose
+              // progress already made.
+              saveCachedImages({ org: ctx.org, repo: ctx.repo, images: state.images });
+            } else {
+              failed += 1;
+            }
+            state.uploadStatus = `Uploading ${done}/${urls.length}\u2026${failed ? ` (${failed} failed)` : ''}`;
             rerender();
           }
           track(EVENTS.IMPORT_COMPLETED);

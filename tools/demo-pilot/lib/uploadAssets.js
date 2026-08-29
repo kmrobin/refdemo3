@@ -7,7 +7,15 @@
 
 import { UPLOAD_TO_DAM_ACTION_URL } from '../config.js';
 
-export const UPLOAD_BATCH_SIZE = 5;
+// Adobe I/O Runtime web actions (the https://*.adobeioruntime.net/.../web/...
+// URL this action is invoked through) sit behind a gateway with a hard,
+// non-configurable external timeout for synchronous HTTP responses — well
+// under a minute in practice. upload-to-dam processes each image sequentially
+// (existence check + optional version checkpoint + initiate + PUT + complete
+// against the AEM Assets API), so batches of more than 1-2 images routinely
+// exceed it and the whole batch comes back as a 504 with nothing uploaded.
+// Smaller batches mean more round trips but each one reliably finishes.
+export const UPLOAD_BATCH_SIZE = 1;
 
 function chunk(arr, size) {
   const out = [];
