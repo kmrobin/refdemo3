@@ -4,6 +4,13 @@
   "editUrlPattern": "https://da.live/edit#/{{org}}/{{site}}{{pathname}}",
   "plugins": [
     {
+      "id": "demo-pilot",
+      "title": "Demo Pilot",
+      "environments": ["edit"],
+      "daLibrary": true,
+      "url": "http://localhost:3000/tools/demo-pilot.html"
+    },
+    {
       "id": "da-plugin-demo",
       "title": "Plugin demo",
       "environments": ["edit"],
