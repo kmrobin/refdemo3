@@ -14,9 +14,19 @@ export const LIVEDEMOS_ASSETS_PATH = '/api/assets';
 
 // Deployed Adobe I/O Runtime action URLs — the only two backend actions kept
 // from the UE extension (both operate on the AEM Assets HTTP API, not
-// CRX/JCR, so they carry over unchanged). Fill these in after `aio app deploy`.
-export const UPLOAD_TO_DAM_ACTION_URL = '';
-export const ENSURE_IMPORT_FOLDER_ACTION_URL = '';
+// CRX/JCR, so they carry over unchanged). Deployed via `aio app deploy` to
+// the DAdemopilotEXT / Production workspace.
+export const UPLOAD_TO_DAM_ACTION_URL = 'https://3635370-966fuchsiacentipede.adobeioruntime.net/api/v1/web/demo-pilot/upload-to-dam';
+export const ENSURE_IMPORT_FOLDER_ACTION_URL = 'https://3635370-966fuchsiacentipede.adobeioruntime.net/api/v1/web/demo-pilot/ensure-import-folder';
+
+// IMS Organization ID for the AEM Cloud Service instance behind
+// aem.repositoryId (sent as x-gw-ims-org-id on Assets HTTP API calls — see
+// actions/upload-to-dam). DA's SDK context has no equivalent field (DA's
+// "org" is a GitHub-org-style project namespace, a completely different
+// identifier), so unlike authorUrl this can't be derived automatically.
+// Find it in Adobe Developer Console for the AEM environment. Optional: the
+// kept action only sends the header when this is non-empty.
+export const AEM_ORG_ID = '';
 
 // DA Admin API origin (Source / List APIs).
 export const DA_ADMIN_ORIGIN = 'https://admin.da.live';

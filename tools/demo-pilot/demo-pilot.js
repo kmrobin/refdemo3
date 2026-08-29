@@ -10,6 +10,8 @@ import DA_SDK from 'https://da.live/nx/utils/sdk.js';
 import { fetchUserEmail } from './lib/userProfile.js';
 import { setAnalyticsContext } from './lib/analytics.js';
 import { readTexts } from './lib/textStorage.js';
+import { fetchAemConfig } from './lib/aemConfig.js';
+import { AEM_ORG_ID } from './config.js';
 import { renderImagesTab } from './tabs/imagesTab.js';
 import { renderTextsTab } from './tabs/textsTab.js';
 import { renderThemeTab } from './tabs/themeTab.js';
@@ -69,7 +71,15 @@ function render(ctx) {
   const { context, token } = await DA_SDK;
   const { org, repo, path, ref } = context;
 
-  setAnalyticsContext({ orgId: org, siteName: repo, aemHost: '' });
+  // aem.repositoryId / imsorg live in the DA site's own config (the same
+  // aem.repositoryId key DA's native AEM Assets picker relies on) — read them
+  // instead of hardcoding per deployment. AEM_ORG_ID is a manual fallback for
+  // sites that haven't added an `imsorg` config row yet.
+  const aemConfig = await fetchAemConfig({ org, repo, token }).catch(() => ({ authorUrl: '', imsOrgId: '' }));
+  const authorUrl = aemConfig.authorUrl;
+  const orgId = aemConfig.imsOrgId || AEM_ORG_ID;
+
+  setAnalyticsContext({ orgId: org, siteName: repo, aemHost: authorUrl });
   fetchUserEmail(token).then((email) => {
     if (email) setAnalyticsContext({ userId: email });
   }).catch(() => { /* analytics must not surface errors */ });
@@ -85,10 +95,9 @@ function render(ctx) {
     repo,
     ref: ref || 'main',
     path,
-    // These two remain reachable only via the kept upload-to-dam action —
-    // set once the AEM Assets side of the site is configured. See config.js.
-    authorUrl: '',
-    orgId: org,
+    // Reachable only via the kept upload-to-dam action.
+    authorUrl,
+    orgId,
     damFolderPath: '/content/dam/imported-assets/en',
   };
 
