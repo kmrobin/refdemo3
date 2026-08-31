@@ -12,12 +12,18 @@
 export const LIVEDEMOS_BASE_URL = 'https://livedemos-scraper.adobe.io';
 export const LIVEDEMOS_ASSETS_PATH = '/api/assets';
 
-// Deployed Adobe I/O Runtime action URLs — the only two backend actions kept
-// from the UE extension (both operate on the AEM Assets HTTP API, not
-// CRX/JCR, so they carry over unchanged). Deployed via `aio app deploy` to
-// the DAdemopilotEXT / Production workspace.
+// Deployed Adobe I/O Runtime action URLs — kept/added backend actions (all
+// operate on the AEM Assets HTTP API, not CRX/JCR). Deployed via
+// `aio app deploy` to the DAdemopilotEXT / Production workspace.
 export const UPLOAD_TO_DAM_ACTION_URL = 'https://3635370-966fuchsiacentipede.adobeioruntime.net/api/v1/web/demo-pilot/upload-to-dam';
 export const ENSURE_IMPORT_FOLDER_ACTION_URL = 'https://3635370-966fuchsiacentipede.adobeioruntime.net/api/v1/web/demo-pilot/ensure-import-folder';
+// Fetches a DAM asset's bytes server-side (Bearer-token auth against AEM
+// Author) and returns them base64-encoded with CORS headers — needed because
+// browser <img>/fetch() against a bare DAM repo path resolves against the
+// wrong origin (the DA site's own delivery domain, not the AEM instance) and,
+// even pointed at the right host, Author isn't generally CORS-open to
+// arbitrary browser origins. See lib/clipboard.js.
+export const GET_DAM_ASSET_ACTION_URL = 'https://3635370-966fuchsiacentipede.adobeioruntime.net/api/v1/web/demo-pilot/get-dam-asset';
 
 // IMS Organization ID for the AEM Cloud Service instance behind
 // aem.repositoryId (sent as x-gw-ims-org-id on Assets HTTP API calls — see
