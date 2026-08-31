@@ -13,6 +13,14 @@ import { readTexts } from './lib/textStorage.js';
 import { fetchAemConfig } from './lib/aemConfig.js';
 import { loadCachedImages } from './lib/imageCache.js';
 import { AEM_ORG_ID, AEM_ASSET_SELECTOR_API_KEY } from './config.js';
+
+// Bump on every change, ever. Logged on load so it's possible to confirm from
+// a screenshot/console alone whether a given browser session is actually
+// running the latest build — stale browser/CDN caching has repeatedly made
+// "did the fix apply?" ambiguous otherwise.
+const PLUGIN_BUILD = 'v9-2026-09-01-no-full-rebuild-on-rerender';
+// eslint-disable-next-line no-console
+console.log(`[DemoPilot] build: ${PLUGIN_BUILD}`);
 import { renderImagesTab } from './tabs/imagesTab.js';
 import { renderTextsTab } from './tabs/textsTab.js';
 import { renderThemeTab } from './tabs/themeTab.js';
@@ -50,20 +58,51 @@ function showToast(message, isError = false) {
   setTimeout(() => el.remove(), 3000);
 }
 
+// Built once; subsequent render() calls reuse this DOM rather than
+// recreating it — see render() below for why that matters.
+let tabBarBuilt = false;
+let panelEl = null;
+
 function render(ctx) {
-  root.innerHTML = `
-    <div class="dp-tabs">
-      ${TABS.map((t) => `<button class="dp-tab ${t.id === state.activeTab ? 'is-active' : ''}" data-tab="${t.id}">${t.label}</button>`).join('')}
-    </div>
-    <div class="dp-panel" id="dp-panel"></div>
-  `;
-  root.querySelector('.dp-tabs').addEventListener('click', (e) => {
-    const btn = e.target.closest('.dp-tab');
-    if (!btn) return;
-    state.activeTab = btn.getAttribute('data-tab');
-    render(ctx);
+  if (!tabBarBuilt) {
+    tabBarBuilt = true;
+    root.innerHTML = `
+      <div class="dp-tabs">
+        ${TABS.map((t) => `<button class="dp-tab" data-tab="${t.id}">${t.label}</button>`).join('')}
+      </div>
+      <div class="dp-panel" id="dp-panel"></div>
+    `;
+    panelEl = root.querySelector('#dp-panel');
+    root.querySelector('.dp-tabs').addEventListener('click', (e) => {
+      const btn = e.target.closest('.dp-tab');
+      if (!btn) return;
+      const nextTab = btn.getAttribute('data-tab');
+      if (nextTab === state.activeTab) return;
+      state.activeTab = nextTab;
+      render(ctx);
+    });
+  }
+
+  root.querySelectorAll('.dp-tab').forEach((btn) => {
+    btn.classList.toggle('is-active', btn.getAttribute('data-tab') === state.activeTab);
   });
-  const panel = root.querySelector('#dp-panel');
+
+  // rerender() is called on every state change, including every single
+  // upload-progress tick during a large import — NOT just on a tab switch.
+  // Recreating #dp-panel's contents on every one of those calls (the old
+  // behavior here) meant imagesTab.js's own "build once" guard could never
+  // hold (it was always looking at a brand-new element), so the embedded
+  // AEM Asset Selector widget got torn down and remounted on every tick
+  // instead of once. Only wipe the panel when the ACTIVE TAB itself changes;
+  // same-tab rerenders reuse the existing DOM so each tab's own "build once"
+  // logic (imagesTab.js's `dpBuilt` flag) actually works as intended.
+  if (panelEl.dataset.lastTab !== state.activeTab) {
+    panelEl.dataset.lastTab = state.activeTab;
+    delete panelEl.dataset.dpBuilt;
+    panelEl.innerHTML = '';
+  }
+
+  const panel = panelEl;
   const active = TABS.find((t) => t.id === state.activeTab);
   active.render(panel, ctx);
 }

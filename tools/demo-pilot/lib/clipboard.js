@@ -26,6 +26,22 @@ async function toPngBlob(sourceBlob) {
   });
 }
 
+// The browser can prompt for clipboard-write permission on the FIRST call in
+// a session — that call rejects (NotAllowedError) while the prompt is
+// pending, even though the user is about to grant it. Give a message that
+// tells them to just click Copy again after allowing, instead of a generic
+// failure that looks like something is actually broken.
+async function writeImageToClipboard(pngBlob) {
+  try {
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
+  } catch (err) {
+    if (err && err.name === 'NotAllowedError') {
+      throw new Error('Clipboard permission needed — allow access in the browser prompt, then click Copy again.');
+    }
+    throw err;
+  }
+}
+
 /**
  * Fetch an already-public image URL and place it on the clipboard as PNG.
  * Only usable when the URL is actually browser-fetchable — real DAM repo
@@ -45,7 +61,7 @@ export async function copyImageToClipboard(imageUrl) {
   if (!resp.ok) throw new Error(`image fetch failed: HTTP ${resp.status}`);
   const rawBlob = await resp.blob();
   const pngBlob = await toPngBlob(rawBlob);
-  await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
+  await writeImageToClipboard(pngBlob);
 }
 
 function base64ToBlob(base64, contentType) {
@@ -83,7 +99,7 @@ export async function copyDamAssetToClipboard({ assetPath, authorUrl, orgId, tok
   if (!base64) throw new Error('get-dam-asset: invalid response');
   const rawBlob = base64ToBlob(base64, contentType || 'application/octet-stream');
   const pngBlob = await toPngBlob(rawBlob);
-  await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
+  await writeImageToClipboard(pngBlob);
 }
 
 /** Place plain text on the clipboard. */
