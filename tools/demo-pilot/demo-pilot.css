@@ -49,6 +49,20 @@ body {
   padding: 12px;
 }
 
+/* Images tab only — let the embedded Asset Selector fill all remaining
+   vertical space instead of a fixed height, so its own internal list scrolls
+   properly instead of leaving dead space below a short, fixed-height box. */
+.dp-images-fill {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.dp-selector-mount {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .dp-row {
   display: flex;
   align-items: center;

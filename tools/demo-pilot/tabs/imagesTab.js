@@ -47,13 +47,15 @@ export function renderImagesTab(container, ctx) {
   if (!container.dataset.dpBuilt) {
     container.dataset.dpBuilt = '1';
     container.innerHTML = `
-      <div class="dp-row">
-        <strong>Images</strong>
-        <sl-button id="dp-images-import">Import from URL</sl-button>
+      <div class="dp-images-fill">
+        <div class="dp-row">
+          <strong>Images</strong>
+          <sl-button id="dp-images-import">Import from URL</sl-button>
+        </div>
+        <p class="dp-status" id="dp-images-status"></p>
+        <p class="dp-error" id="dp-selector-error"></p>
+        <div id="dp-asset-selector-mount" class="dp-selector-mount"></div>
       </div>
-      <p class="dp-status" id="dp-images-status"></p>
-      <p class="dp-error" id="dp-selector-error"></p>
-      <div id="dp-asset-selector-mount" style="height:520px;"></div>
     `;
 
     container.querySelector('#dp-images-import').addEventListener('click', () => {
