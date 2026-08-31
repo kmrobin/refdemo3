@@ -12,7 +12,7 @@ import { setAnalyticsContext } from './lib/analytics.js';
 import { readTexts } from './lib/textStorage.js';
 import { fetchAemConfig } from './lib/aemConfig.js';
 import { loadCachedImages } from './lib/imageCache.js';
-import { AEM_ORG_ID } from './config.js';
+import { AEM_ORG_ID, AEM_ASSET_SELECTOR_API_KEY } from './config.js';
 import { renderImagesTab } from './tabs/imagesTab.js';
 import { renderTextsTab } from './tabs/textsTab.js';
 import { renderThemeTab } from './tabs/themeTab.js';
@@ -72,13 +72,15 @@ function render(ctx) {
   const { context, token } = await DA_SDK;
   const { org, repo, path, ref } = context;
 
-  // aem.repositoryId / imsorg live in the DA site's own config (the same
-  // aem.repositoryId key DA's native AEM Assets picker relies on) — read them
-  // instead of hardcoding per deployment. AEM_ORG_ID is a manual fallback for
-  // sites that haven't added an `imsorg` config row yet.
-  const aemConfig = await fetchAemConfig({ org, repo, token }).catch(() => ({ authorUrl: '', imsOrgId: '' }));
+  // aem.repositoryId / imsorg / aem.assetSelectorApiKey live in the DA
+  // site's own config (the same aem.repositoryId key DA's native AEM Assets
+  // picker relies on) — read them instead of hardcoding per deployment.
+  // AEM_ORG_ID / AEM_ASSET_SELECTOR_API_KEY are manual fallbacks for sites
+  // that haven't added those config rows yet.
+  const aemConfig = await fetchAemConfig({ org, repo, token }).catch(() => ({ authorUrl: '', imsOrgId: '', assetSelectorApiKey: '' }));
   const authorUrl = aemConfig.authorUrl;
   const orgId = aemConfig.imsOrgId || AEM_ORG_ID;
+  const assetSelectorApiKey = aemConfig.assetSelectorApiKey || AEM_ASSET_SELECTOR_API_KEY;
 
   setAnalyticsContext({ orgId: org, siteName: repo, aemHost: authorUrl });
   fetchUserEmail(token).then((email) => {
@@ -102,6 +104,7 @@ function render(ctx) {
     // Reachable only via the kept upload-to-dam action.
     authorUrl,
     orgId,
+    assetSelectorApiKey,
     damFolderPath: '/content/dam/imported-assets/en',
   };
 

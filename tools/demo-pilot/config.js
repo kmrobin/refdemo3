@@ -34,6 +34,15 @@ export const GET_DAM_ASSET_ACTION_URL = 'https://3635370-966fuchsiacentipede.ado
 // kept action only sends the header when this is non-empty.
 export const AEM_ORG_ID = '';
 
+// IMS Client ID ("API Key") for the embedded AEM Assets Selector widget's own
+// API calls — a separate credential from the DA plugin's own IMS
+// token/audience. Per Adobe's Asset Selector integration guidance this is
+// required alongside imsToken/imsOrg; get it from an API/OAuth credential
+// added to the Developer Console project (e.g. DAdemopilotEXT), NOT the
+// App Builder action credentials. Selector may fail to authenticate without
+// it even though imsToken/imsOrg alone look sufficient.
+export const AEM_ASSET_SELECTOR_API_KEY = '';
+
 // DA Admin API origin (Source / List APIs).
 export const DA_ADMIN_ORIGIN = 'https://admin.da.live';
 

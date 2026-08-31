@@ -21,9 +21,12 @@ import { saveCachedImages } from '../lib/imageCache.js';
 import { UPLOAD_TO_DAM_ACTION_URL } from '../config.js';
 
 // Most SVGs a scrape turns up are decorative iconography/logos (nav icons,
-// social badges, "AdChoices", etc.), not content an author wants to reuse —
-// excluded by default rather than uploading dozens of icons alongside the
-// handful of real images.
+// social badges, "AdChoices", etc.), not content an author wants to reuse.
+// This is only a fast-path pre-filter on the URL's own extension — plenty of
+// real-world image URLs carry no extension at all (dynamic/CDN-served, real
+// format only known from the response), so this alone WILL miss some SVGs.
+// The authoritative check is server-side in upload-to-dam (real Content-Type
+// after download) — this just avoids uploading the obvious cases at all.
 function isSvg(url) {
   try { return new URL(url).pathname.toLowerCase().endsWith('.svg'); } catch (_) { return /\.svg(\?|$)/i.test(url || ''); }
 }
@@ -99,6 +102,7 @@ export function renderImagesTab(container, ctx) {
           rerender();
           let done = 0;
           let failed = 0;
+          let skipped = 0;
           const srcByUrl = new Map((scrapedImages || []).map((i) => [i.src, i.src]));
           try {
             for await (const result of uploadAssetsInBatches(urls, {
@@ -119,10 +123,12 @@ export function renderImagesTab(container, ctx) {
                 // Runtime web action's ~60s gateway ceiling) shouldn't lose
                 // progress already made.
                 saveCachedImages({ org: ctx.org, repo: ctx.repo, images: state.images });
+              } else if (result.skipped) {
+                skipped += 1;
               } else {
                 failed += 1;
               }
-              state.uploadStatus = `Uploading ${done}/${urls.length}\u2026${failed ? ` (${failed} failed)` : ''}`;
+              state.uploadStatus = `Uploading ${done}/${urls.length}…${failed ? ` (${failed} failed)` : ''}${skipped ? ` (${skipped} SVG skipped)` : ''}`;
               rerender();
             }
             track(EVENTS.IMPORT_COMPLETED);
@@ -159,15 +165,16 @@ export function renderImagesTab(container, ctx) {
   // not on every rerender (see module doc).
   const selectorMount = container.querySelector('#dp-asset-selector-mount');
   const repositoryId = repositoryIdFromAuthorUrl(ctx.authorUrl);
-  const mountKey = `${ctx.token}|${ctx.orgId}|${repositoryId}|${ctx.damFolderPath}`;
+  const mountKey = `${ctx.token}|${ctx.orgId}|${ctx.assetSelectorApiKey}|${repositoryId}|${ctx.damFolderPath}`;
   if (selectorMount.dataset.mountKey !== mountKey && ctx.token && repositoryId && ctx.damFolderPath) {
     selectorMount.dataset.mountKey = mountKey;
     mountAssetSelector(selectorMount, {
       imsToken: ctx.token,
       imsOrg: ctx.orgId,
+      apiKey: ctx.assetSelectorApiKey,
       repositoryId,
       path: ctx.damFolderPath,
-      onAssetPick: (damPath) => copyImage({ path: damPath }, ctx, toast),
+      onAssetPick: (selection) => copyImage({ path: selection.path }, ctx, toast),
     }).catch((err) => {
       container.querySelector('#dp-selector-error').textContent = (err && err.message) || 'Could not load the AEM Asset Selector.';
     });

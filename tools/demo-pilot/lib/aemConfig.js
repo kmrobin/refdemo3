@@ -59,14 +59,19 @@ export function authorUrlFromRepositoryId(repositoryId) {
 }
 
 /**
- * Fetch the DA site config once and pull out both AEM Assets integration
- * values: `aem.repositoryId` (-> authorUrl) and `imsorg` (-> the IMS
- * Organization ID for the x-gw-ims-org-id header). Both are '' when absent.
+ * Fetch the DA site config once and pull out the AEM Assets integration
+ * values: `aem.repositoryId` (-> authorUrl), `imsorg` (-> the IMS
+ * Organization ID for the x-gw-ims-org-id header), and an optional
+ * `aem.assetSelectorApiKey` (-> the embedded Asset Selector widget's own IMS
+ * Client ID — see config.js AEM_ASSET_SELECTOR_API_KEY, which is only a
+ * fallback for sites that haven't added this config row). All are '' when
+ * absent.
  */
 export async function fetchAemConfig({ org, repo, token }) {
   const rows = await fetchDaConfigRows({ org, repo, token });
   return {
     authorUrl: authorUrlFromRepositoryId(rows['aem.repositoryId'] || ''),
     imsOrgId: rows.imsorg || '',
+    assetSelectorApiKey: rows['aem.assetSelectorApiKey'] || '',
   };
 }
