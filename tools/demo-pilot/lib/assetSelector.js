@@ -85,18 +85,23 @@ export function repositoryIdFromAuthorUrl(authorUrl) {
  *                                      own API calls — separate from the DA
  *                                      plugin's own IMS token/audience. See
  *                                      config.js AEM_ASSET_SELECTOR_API_KEY.
+ *                                      NOT confirmed to actually be required
+ *                                      when using a DA-issued imsToken (DA's
+ *                                      own native AEM Assets picker needs no
+ *                                      such config from site admins) — passed
+ *                                      through if set, but not required.
  * @param {string} opts.path            DAM folder to browse
  * @param {(selection: ReturnType<typeof normalizeSelectedAsset>) => void} opts.onAssetPick
  */
 export async function mountAssetSelector(mount, { imsToken, imsOrg, repositoryId, apiKey, path, onAssetPick }) {
-  // Pre-flight config check — a missing repositoryId/apiKey produces a
-  // confusing/blank widget rather than a clear error, so fail fast here with
-  // an actionable message instead of letting the widget try and silently do
-  // nothing.
+  // Pre-flight config check — only the two values we know for certain the
+  // widget needs. apiKey is passed through when present but NOT required
+  // here: whether it's actually needed alongside a DA-issued imsToken is
+  // unconfirmed, so we let the real widget/Adobe API be the judge of that
+  // instead of guessing and blocking before ever trying.
   const missing = [];
   if (!repositoryId) missing.push('aem.repositoryId (DA site config)');
   if (!imsToken) missing.push('IMS token');
-  if (!apiKey) missing.push('AEM Asset Selector API key (config.js AEM_ASSET_SELECTOR_API_KEY or DA config aem.assetSelectorApiKey)');
   if (missing.length) {
     throw new Error(`AEM Assets is not configured for this DA site \u2014 missing: ${missing.join(', ')}.`);
   }
@@ -114,7 +119,7 @@ export async function mountAssetSelector(mount, { imsToken, imsOrg, repositoryId
   PJS.renderAssetSelector(mount, {
     imsToken,
     imsOrg,
-    apiKey,
+    ...(apiKey ? { apiKey } : {}),
     repositoryId,
     path,
     rail: true,
