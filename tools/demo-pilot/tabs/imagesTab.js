@@ -1,10 +1,11 @@
 /*
- * imagesTab — scrape + upload-to-DAM + copy-to-clipboard for images, plus a
- * persistent AEM Assets Selector for browsing the whole imported-assets DAM
- * folder (not just this session's scraped images) — replaces the UE
- * extension's ImagesTab.js + replaceImage.js: instead of an embedded
- * UE-selection "replace" call, picking an image just copies it to the
- * clipboard so the author can paste it into the open DA document.
+ * imagesTab — scrape + upload-to-DAM, then browse/copy via the embedded AEM
+ * Assets Selector. Uploaded images land in the same DAM folder the Selector
+ * browses, so — matching the original UE extension's design — the Selector
+ * IS the single source of truth for "images available to use". We don't
+ * keep a separate in-session thumbnail grid alongside it; that duplicated
+ * what the Selector already shows and its bare-repo-path/CORS handling was
+ * its own source of bugs.
  *
  * This tab builds its DOM shell once per container (see `dpBuilt` guard)
  * rather than on every render like the other tabs — re-creating the Asset
@@ -13,11 +14,10 @@
  */
 
 import { uploadAssetsInBatches } from '../lib/uploadAssets.js';
-import { copyImageToClipboard, copyDamAssetToClipboard } from '../lib/clipboard.js';
+import { copyDamAssetToClipboard } from '../lib/clipboard.js';
 import { openScrapeModal } from '../lib/scrapeModal.js';
 import { mountAssetSelector, repositoryIdFromAuthorUrl } from '../lib/assetSelector.js';
 import { track, EVENTS } from '../lib/analytics.js';
-import { saveCachedImages } from '../lib/imageCache.js';
 import { UPLOAD_TO_DAM_ACTION_URL } from '../config.js';
 
 // Most SVGs a scrape turns up are decorative iconography/logos (nav icons,
@@ -31,13 +31,9 @@ function isSvg(url) {
   try { return new URL(url).pathname.toLowerCase().endsWith('.svg'); } catch (_) { return /\.svg(\?|$)/i.test(url || ''); }
 }
 
-async function copyImage(img, ctx, toast) {
+async function copyDamPath(damPath, ctx, toast) {
   try {
-    if (img.path) {
-      await copyDamAssetToClipboard({ assetPath: img.path, authorUrl: ctx.authorUrl, orgId: ctx.orgId, token: ctx.token });
-    } else {
-      await copyImageToClipboard(img.src);
-    }
+    await copyDamAssetToClipboard({ assetPath: damPath, authorUrl: ctx.authorUrl, orgId: ctx.orgId, token: ctx.token });
     track(EVENTS.IMAGE_COPIED);
     toast('Image copied — paste it into your document.');
   } catch (err) {
@@ -56,25 +52,15 @@ export function renderImagesTab(container, ctx) {
         <sl-button id="dp-images-import">Import from URL</sl-button>
       </div>
       <p class="dp-status" id="dp-images-status"></p>
-      <div class="dp-grid" id="dp-images-grid"></div>
-      <p class="dp-status" id="dp-images-empty"></p>
-      <div class="dp-row" style="margin-top:16px;"><strong>Browse DAM folder</strong></div>
       <p class="dp-error" id="dp-selector-error"></p>
-      <div id="dp-asset-selector-mount" style="height:320px;"></div>
+      <div id="dp-asset-selector-mount" style="height:520px;"></div>
     `;
 
-    container.querySelector('#dp-images-grid').addEventListener('click', async (e) => {
-      const btn = e.target.closest('.dp-copy-btn');
-      if (!btn) return;
-      const idx = Number(btn.getAttribute('data-idx'));
-      const img = (ctx.state.images || [])[idx];
-      if (!img) return;
-      btn.setAttribute('disabled', 'true');
-      await copyImage(img, ctx, toast);
-      btn.removeAttribute('disabled');
-    });
-
     container.querySelector('#dp-images-import').addEventListener('click', () => {
+      if (!UPLOAD_TO_DAM_ACTION_URL) {
+        toast('upload-to-dam action is not configured — cannot import images.', true);
+        return;
+      }
       openScrapeModal({
         token: ctx.token,
         mode: 'images',
@@ -85,25 +71,11 @@ export function renderImagesTab(container, ctx) {
           const urls = allUrls.filter((u) => !isSvg(u));
           if (svgCount) toast(`Skipped ${svgCount} SVG icon(s) \u2014 not imported.`);
 
-          // Local-dev fallback: without a deployed upload-to-dam action
-          // there's nothing to upload to, so show the scraped (hot-linked)
-          // URLs directly — good enough to exercise the copy-to-clipboard
-          // flow. Real usage always goes through the DAM upload below.
-          if (!UPLOAD_TO_DAM_ACTION_URL) {
-            state.images.push(...urls.map((src) => ({ src })));
-            saveCachedImages({ org: ctx.org, repo: ctx.repo, images: state.images });
-            toast('upload-to-dam not configured — showing scraped URLs directly (not uploaded to DAM).', true);
-            track(EVENTS.IMPORT_COMPLETED);
-            rerender();
-            return;
-          }
-
           state.uploadStatus = `Uploading 0/${urls.length}\u2026`;
           rerender();
           let done = 0;
           let failed = 0;
           let skipped = 0;
-          const srcByUrl = new Map((scrapedImages || []).map((i) => [i.src, i.src]));
           try {
             for await (const result of uploadAssetsInBatches(urls, {
               imsToken: ctx.token,
@@ -114,24 +86,22 @@ export function renderImagesTab(container, ctx) {
             })) {
               done += 1;
               if (result.ok && result.path) {
-                // Keep the original scraped URL for immediate <img> preview
-                // (plain display never needs CORS) alongside the real DAM
-                // path (needed for Copy, via get-dam-asset — see clipboard.js).
-                state.images.push({ src: srcByUrl.get(result.sourceUrl) || result.sourceUrl, path: result.path });
-                // Persist after every successful item, not just at the end —
-                // a later batch timing out (large imports commonly hit the
-                // Runtime web action's ~60s gateway ceiling) shouldn't lose
-                // progress already made.
-                saveCachedImages({ org: ctx.org, repo: ctx.repo, images: state.images });
+                // Nothing to do here — the Selector below reads straight from
+                // DAM and gets refreshed (see selectorRefresh) once this finishes.
               } else if (result.skipped) {
                 skipped += 1;
               } else {
                 failed += 1;
+                // eslint-disable-next-line no-console -- surfaced count only in the status line; full reason belongs in devtools
+                console.warn('[DemoPilot] upload failed:', result.sourceUrl, result.error);
               }
               state.uploadStatus = `Uploading ${done}/${urls.length}…${failed ? ` (${failed} failed)` : ''}${skipped ? ` (${skipped} SVG skipped)` : ''}`;
               rerender();
             }
             track(EVENTS.IMPORT_COMPLETED);
+            // Bump the Selector's mount key so it remounts once, now, and
+            // shows the freshly uploaded assets — not on every progress tick.
+            state.selectorRefresh = (state.selectorRefresh || 0) + 1;
           } catch (err) {
             toast((err && err.message) || 'Upload failed', true);
           } finally {
@@ -145,27 +115,12 @@ export function renderImagesTab(container, ctx) {
 
   container.querySelector('#dp-images-status').textContent = state.uploadStatus || '';
 
-  const images = state.images || [];
-  container.querySelector('#dp-images-empty').textContent =
-    images.length === 0 ? 'No images yet. Import from a live URL to get started.' : '';
-
-  const grid = container.querySelector('#dp-images-grid');
-  grid.innerHTML = '';
-  images.forEach((img, idx) => {
-    const card = document.createElement('div');
-    card.className = 'dp-card';
-    card.innerHTML = `
-      <img src="${img.src || img.path}" alt="" loading="lazy" />
-      <sl-button class="dp-copy-btn" data-idx="${idx}">Copy</sl-button>
-    `;
-    grid.appendChild(card);
-  });
-
-  // Mount/refresh the Asset Selector only when its inputs actually change —
-  // not on every rerender (see module doc).
+  // Mount/refresh the Asset Selector only when its inputs (or selectorRefresh,
+  // bumped after an import completes) actually change — not on every
+  // rerender (see module doc).
   const selectorMount = container.querySelector('#dp-asset-selector-mount');
   const repositoryId = repositoryIdFromAuthorUrl(ctx.authorUrl);
-  const mountKey = `${ctx.token}|${ctx.orgId}|${ctx.assetSelectorApiKey}|${repositoryId}|${ctx.damFolderPath}`;
+  const mountKey = `${ctx.token}|${ctx.orgId}|${ctx.assetSelectorApiKey}|${repositoryId}|${ctx.damFolderPath}|${state.selectorRefresh || 0}`;
   if (selectorMount.dataset.mountKey !== mountKey && ctx.token && repositoryId && ctx.damFolderPath) {
     selectorMount.dataset.mountKey = mountKey;
     mountAssetSelector(selectorMount, {
@@ -174,7 +129,7 @@ export function renderImagesTab(container, ctx) {
       apiKey: ctx.assetSelectorApiKey,
       repositoryId,
       path: ctx.damFolderPath,
-      onAssetPick: (selection) => copyImage({ path: selection.path }, ctx, toast),
+      onAssetPick: (selection) => copyDamPath(selection.path, ctx, toast),
     }).catch((err) => {
       container.querySelector('#dp-selector-error').textContent = (err && err.message) || 'Could not load the AEM Asset Selector.';
     });

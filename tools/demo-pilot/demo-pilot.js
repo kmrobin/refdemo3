@@ -11,14 +11,13 @@ import { fetchUserEmail } from './lib/userProfile.js';
 import { setAnalyticsContext } from './lib/analytics.js';
 import { readTexts } from './lib/textStorage.js';
 import { fetchAemConfig } from './lib/aemConfig.js';
-import { loadCachedImages } from './lib/imageCache.js';
 import { AEM_ORG_ID, AEM_ASSET_SELECTOR_API_KEY } from './config.js';
 
 // Bump on every change, ever. Logged on load so it's possible to confirm from
 // a screenshot/console alone whether a given browser session is actually
 // running the latest build — stale browser/CDN caching has repeatedly made
 // "did the fix apply?" ambiguous otherwise.
-const PLUGIN_BUILD = 'v9-2026-09-01-no-full-rebuild-on-rerender';
+const PLUGIN_BUILD = 'v10-2026-09-01-selector-is-source-of-truth';
 // eslint-disable-next-line no-console
 console.log(`[DemoPilot] build: ${PLUGIN_BUILD}`);
 import { renderImagesTab } from './tabs/imagesTab.js';
@@ -35,12 +34,12 @@ const root = document.getElementById('demo-pilot-root');
 
 const state = {
   activeTab: 'images',
-  images: [],
   texts: {},
   themes: [],
   themesLoaded: false,
   uploadStatus: '',
   themeStatus: '',
+  selectorRefresh: 0,
 };
 
 function showToast(message, isError = false) {
@@ -127,9 +126,6 @@ function render(ctx) {
   }).catch(() => { /* analytics must not surface errors */ });
 
   state.texts = await readTexts({ org, repo, token }).catch(() => ({}));
-  // Browser-cached images from a previous session for this exact site — see
-  // lib/imageCache.js. Shown immediately, no re-scrape/re-upload needed.
-  state.images = loadCachedImages({ org, repo });
 
   const ctx = {
     state,
