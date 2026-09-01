@@ -67,6 +67,30 @@ body {
 .dp-selector-mount {
   flex: 1 1 auto;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* The Selector widget's own host-side wrapper + iframe (not cross-origin
+   content — these two elements live in our document). Both need explicit
+   flex participation: without it they keep whatever height the widget
+   measured at mount time instead of filling .dp-selector-mount, leaving a
+   dead strip below a short iframe. */
+.dp-selector-mount [data-testid="asset-selector-shim-container"] {
+  display: flex;
+  flex: 1 1 0%;
+  min-height: 0;
+  width: 100% !important;
+}
+
+.dp-selector-mount iframe[data-testid="microfrontend"] {
+  display: block;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100% !important;
+  height: 100% !important;
+  border: 0;
 }
 
 .dp-row {

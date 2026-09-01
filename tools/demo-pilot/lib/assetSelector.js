@@ -140,4 +140,11 @@ export async function mountAssetSelector(mount, { imsToken, imsOrg, repositoryId
     handleAssetSelection: (assets) => pick(assets && assets[0]),
     handleNavigateToAsset: (asset) => pick(asset),
   });
+
+  // The widget's iframe can size itself off an early, pre-final-layout
+  // measurement of the mount (e.g. mid tab-switch/flex reflow), leaving it
+  // shorter than the space it's actually given. Nudge it to remeasure once
+  // our own layout has settled, without looping.
+  requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+  setTimeout(() => window.dispatchEvent(new Event('resize')), 300);
 }
