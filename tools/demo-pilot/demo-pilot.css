@@ -45,6 +45,12 @@ body {
 
 .dp-panel {
   flex: 1 1 auto;
+  /* A flex item's default min-height is `auto`, meaning it refuses to shrink
+     below its content's height — without this, a tall child (the Asset
+     Selector's internal list) makes .dp-panel itself grow past its allocated
+     space instead of clipping/scrolling it, so you end up scrolling the
+     whole pane (tabs, header, everything) instead of just the asset list. */
+  min-height: 0;
   overflow-y: auto;
   padding: 12px;
 }

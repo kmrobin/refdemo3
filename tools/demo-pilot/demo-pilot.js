@@ -17,7 +17,7 @@ import { AEM_ORG_ID, AEM_ASSET_SELECTOR_API_KEY } from './config.js';
 // a screenshot/console alone whether a given browser session is actually
 // running the latest build — stale browser/CDN caching has repeatedly made
 // "did the fix apply?" ambiguous otherwise.
-const PLUGIN_BUILD = 'v11-2026-09-01-selector-fills-panel-height';
+const PLUGIN_BUILD = 'v12-2026-09-01-panel-min-height-zero-fix';
 // eslint-disable-next-line no-console
 console.log(`[DemoPilot] build: ${PLUGIN_BUILD}`);
 import { renderImagesTab } from './tabs/imagesTab.js';
